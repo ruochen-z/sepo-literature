@@ -1,0 +1,575 @@
+{
+  "author": {
+    "is_bot": true,
+    "login": "app/sepo-agent-app"
+  },
+  "baseRefName": "main",
+  "body": "## Summary\n\nUpdates the installed Sepo agent infrastructure from **0.3.1** to **v0.4.0** (`df515121bbc9e9d0e066642df57ac6075b90ee8f`).\n\n- **Source:** `self-evolving/repo` @ `v0.4.0` (SHA `df515121bbc9e9d0e066642df57ac6075b90ee8f`, resolution: latest-release)\n- **Target branch:** `agent/update-agent-infra-20260701` (base `main`)\n- **Scope:** `.agent/` (69 files) and `.github/` (23 files) — 92 files changed, no files outside agent-owned infrastructure\n\n### Notable upstream changes in 0.4.0\n- Live progress comments for implement/fix-PR runs, with thumbs-down cancellation.\n- New `/add-rubrics` route (draft PRs against `agent/rubrics`).\n- `download-github-attachment` CLI for private attachments.\n- Bundled `.agent/model-defaults.json` provider defaults.\n- Lane-based `.agent` test scripts (runtime / workflow / docs / shell).\n- ACPX date-pinned `claude-*` model fix and progress-reporting robustness fixes.\n\n## Audit summary\n\nThis install carries **literature-specific customizations inside the agent-owned tree**, so a blind overwrite was not safe. Files were classified against the pristine 0.3.1 baseline and merged accordingly:\n\n| Action | Files |\n|---|---|\n| Take upstream (no local customization) | most `.agent/src`, `.agent/docs`, all changed `.github` workflows/prompts, `run-agent-task/action.yml` |\n| Add new (0.4.0) | `progress-*`, `env.ts`, `actor-association.ts`, `github-attachment-download.ts`, `download-github-attachment.ts`, `cli/progress/`, local-runner `hooks/`, prompt `agent-add-rubrics.md` |\n| 3-way merge (target customization + upstream) | `.agent/src/github.ts` (literature deployment helpers), `.agent/src/acpx-adapter.ts`, `.agent/src/__tests__/acpx-adapter.test.ts`, `.agent/docs/customization/configuration-list.md`, `.agent/docs/index.md`, `.agent/package.json` (version bump only) |\n| Resolved to upstream superset | `.agent/src/__tests__/envelope.test.ts` (upstream includes the target's helper plus a new one) |\n| Keep target (upstream unchanged vs 0.3.1) | `.agent/src/discussion.ts` |\n| Preserve target customization | `.github/workflows/test-scripts.yml` (adds root Quartz `npm run check` / `npm run build` validation on top of the 0.4.0 agent check lanes) |\n\n### Customizations preserved (target-owned, untouched)\n- `.agent/src`: `literature-update.ts`, `cli/publish-literature-update.ts`, `cli/publish-preview-deployment.ts`, `cli/publish-canonical-deployment.ts`, `cli/inactivate-preview-deployments.ts`, and their tests\n- `.github/workflows`: `agent-add-paper.yml`, `agent-literature-daily.yml`, `agent-deploy-site-main.yml`, `agent-site-preview.yml`, `deploy.yml`\n- `.github/prompts`: `literature-add-paper.md`, `literature-daily.md`\n- `.github/actions`: `deploy-sepo-site`, `resolve-discussion-ids`, `resolve-agent-provider/package.json`\n- `.github`: `ISSUE_TEMPLATE/*`, `dependabot.yml`, `pull_request_template.md`\n- Root `.gitignore` already contained `.agent/dist/` and `.agent/node_modules/` — no change needed\n\n### Removed files\n- None (obsolete/legacy removal was disabled for this run).\n\n## Validation\n\n- `npm --prefix .agent ci` — OK\n- `npm --prefix .agent run build` (tsc) — OK (verified target literature CLIs compile against merged `github.ts`)\n- `npm --prefix .agent test` (build + runtime + workflow + docs + shell lanes) — **739 tests pass, 0 fail**\n- YAML parse of all 30 workflows + composite actions + action templates — OK\n- `git diff --check` and `git diff --cached --check` — clean\n\n## Branch status\n- `agent/memory` exists — will not be reinitialized.\n- `agent/rubrics` missing — optional; run `Agent / Rubrics / Initialization` only if the repo wants rubric steering.\n\n## Post-merge notes (document only)\n1. Verify provider/auth secrets still match the updated workflows.\n2. `agent/memory` already exists — rely on ongoing memory sync/scan workflows.\n3. Optionally initialize `agent/rubrics` if rubric steering is desired (enables the new `/add-rubrics` route end-to-end).\n4. Smoke-test with an issue mentioning `@sepo-agent /answer`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+  "closedAt": null,
+  "comments": [],
+  "createdAt": "2026-07-01T12:32:51Z",
+  "files": [
+    {
+      "path": ".agent/CHANGELOG.md",
+      "additions": 23,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/action-templates/agent-action-template.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/architecture/request-lifecycle.md",
+      "additions": 4,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/architecture/rubrics.md",
+      "additions": 11,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/customization/configuration-list.md",
+      "additions": 17,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/index.md",
+      "additions": 9,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/overview/quick-start.md",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/setup/setup-guide.md",
+      "additions": 17,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/technical-details/developer-notes.md",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/technical-details/key-concepts.md",
+      "additions": 3,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/usage/agent-actions.md",
+      "additions": 7,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/usage/internal-actions.md",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/docs/usage/supported-workflows.md",
+      "additions": 17,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/package-lock.json",
+      "additions": 2,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/package.json",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/acpx-adapter.test.ts",
+      "additions": 171,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/actor-association.test.ts",
+      "additions": 147,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/approval.test.ts",
+      "additions": 7,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/dispatch-agent-implement-cli.test.ts",
+      "additions": 4,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/env.test.ts",
+      "additions": 24,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/envelope.test.ts",
+      "additions": 310,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/github-attachment-download.test.ts",
+      "additions": 274,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/github.test.ts",
+      "additions": 46,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/onboarding-check-cli.test.ts",
+      "additions": 7,
+      "deletions": 5,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/post-comment-cli.test.ts",
+      "additions": 68,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/post-response-cli.test.ts",
+      "additions": 56,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/progress-cancel.test.ts",
+      "additions": 81,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/progress-final-comment.test.ts",
+      "additions": 30,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/progress-policy.test.ts",
+      "additions": 191,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/progress-render.test.ts",
+      "additions": 347,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/progress-report.test.ts",
+      "additions": 614,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/reactions.test.ts",
+      "additions": 173,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/__tests__/response.test.ts",
+      "additions": 74,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/rubrics.test.ts",
+      "additions": 15,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/triage.test.ts",
+      "additions": 41,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/__tests__/verify.test.ts",
+      "additions": 42,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/acpx-adapter.ts",
+      "additions": 22,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/actor-association.ts",
+      "additions": 116,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/approval.ts",
+      "additions": 5,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/create-pr.ts",
+      "additions": 19,
+      "deletions": 7,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/download-github-attachment.ts",
+      "additions": 112,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/cli/extract-context.ts",
+      "additions": 13,
+      "deletions": 53,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/orchestrate-handoff.ts",
+      "additions": 1,
+      "deletions": 25,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/parse-response.ts",
+      "additions": 7,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/post-comment.ts",
+      "additions": 41,
+      "deletions": 4,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/post-response.ts",
+      "additions": 21,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/prepare-approval.ts",
+      "additions": 10,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/cli/progress-report.ts",
+      "additions": 604,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/cli/progress/resolve-policy.ts",
+      "additions": 86,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/cli/resolve-progress-status.ts",
+      "additions": 25,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/cli/verify.ts",
+      "additions": 8,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/env.ts",
+      "additions": 7,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/envelope.ts",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/github-attachment-download.ts",
+      "additions": 275,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/github.ts",
+      "additions": 22,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/onboarding.ts",
+      "additions": 9,
+      "deletions": 13,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/progress-cancel.ts",
+      "additions": 103,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/progress-final-comment.ts",
+      "additions": 96,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/progress-policy.ts",
+      "additions": 158,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/progress-render.ts",
+      "additions": 495,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/src/reactions.ts",
+      "additions": 140,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/response.ts",
+      "additions": 107,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/rubrics.ts",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/run.ts",
+      "additions": 17,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/triage.ts",
+      "additions": 50,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/src/verify.ts",
+      "additions": 35,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/tools/local-runner/README.md",
+      "additions": 30,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".agent/tools/local-runner/hooks/post-job-cleanup.sh",
+      "additions": 59,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".agent/tools/local-runner/setup-runners.sh",
+      "additions": 22,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/actions/run-agent-task/action.yml",
+      "additions": 153,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/prompts/_base.md",
+      "additions": 12,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/prompts/_rubrics.md",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/prompts/agent-add-rubrics.md",
+      "additions": 53,
+      "deletions": 0,
+      "changeType": "ADDED"
+    },
+    {
+      "path": ".github/prompts/agent-dispatch.md",
+      "additions": 5,
+      "deletions": 3,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/prompts/rubrics-initialization.md",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/prompts/rubrics-update.md",
+      "additions": 1,
+      "deletions": 1,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-approve.yml",
+      "additions": 2,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-daily-summary.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-fix-pr.yml",
+      "additions": 18,
+      "deletions": 4,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-implement.yml",
+      "additions": 40,
+      "deletions": 4,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-memory-bootstrap.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-memory-pr-closed.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-memory-scan.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-orchestrator.yml",
+      "additions": 2,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-project-manager.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-review.yml",
+      "additions": 5,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-router.yml",
+      "additions": 22,
+      "deletions": 2,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-rubrics-initialization.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-rubrics-review.yml",
+      "additions": 105,
+      "deletions": 6,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-rubrics-update.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-self-approve.yml",
+      "additions": 2,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    },
+    {
+      "path": ".github/workflows/agent-update.yml",
+      "additions": 1,
+      "deletions": 0,
+      "changeType": "MODIFIED"
+    }
+  ],
+  "headRefName": "agent/update-agent-infra-20260701",
+  "labels": [],
+  "mergedAt": null,
+  "number": 4,
+  "reviewDecision": "",
+  "reviews": [],
+  "state": "OPEN",
+  "title": "Update Sepo from 0.3.1 to v0.4.0/df515121bbc9e9d0e066642df57ac6075b90ee8f",
+  "updatedAt": "2026-07-01T12:32:51Z",
+  "url": "https://github.com/ruochen-z/sepo-literature/pull/4"
+}
