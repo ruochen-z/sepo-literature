@@ -4,7 +4,7 @@
     "login": "app/sepo-agent-app"
   },
   "body": "Use this issue to track Sepo setup for this repository.\n\nThe latest setup status is maintained in the comment below.\n",
-  "closedAt": null,
+  "closedAt": "2026-07-26T10:26:35Z",
   "comments": [
     {
       "id": "IC_kwDOTFThkM8AAAABHk7j1w",
@@ -20,6 +20,21 @@
       "reactionGroups": [],
       "url": "https://github.com/ruochen-z/sepo-literature/issues/2#issuecomment-4803453911",
       "viewerDidAuthor": true
+    },
+    {
+      "id": "IC_kwDOTFThkM8AAAABLvmdog",
+      "author": {
+        "login": "github-actions"
+      },
+      "authorAssociation": "NONE",
+      "body": "Closing because this agent issue has had no activity for 30 days.",
+      "createdAt": "2026-07-26T10:26:34Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/ruochen-z/sepo-literature/issues/2#issuecomment-5083078050",
+      "viewerDidAuthor": false
     }
   ],
   "createdAt": "2026-06-25T19:30:03Z",
@@ -32,8 +47,8 @@
     }
   ],
   "number": 2,
-  "state": "OPEN",
+  "state": "CLOSED",
   "title": "Sepo setup check",
-  "updatedAt": "2026-06-25T19:30:05Z",
+  "updatedAt": "2026-07-26T10:26:35Z",
   "url": "https://github.com/ruochen-z/sepo-literature/issues/2"
 }
