@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 
@@ -152,20 +160,20 @@ test("buildClaudePinnedModelEnv ignores aliases, non-Claude agents, and preset o
   );
 });
 
-test("resolveAcpxModelSelection folds GPT-5 Codex reasoning into the model id", () => {
+test("resolveAcpxModelSelection separates Codex model and reasoning options", () => {
   assert.deepEqual(
     resolveAcpxModelSelection({ agent: "codex", model: "gpt-5.5", thoughtLevel: "xhigh" }),
-    { model: "gpt-5.5/xhigh", thoughtLevel: undefined, reasoningEncodedInModel: true },
+    { model: "gpt-5.5", thoughtLevel: "xhigh", reasoningEncodedInModel: false },
   );
 
   assert.deepEqual(
-    resolveAcpxModelSelection({ agent: "codex", model: "gpt-5.5/high", thoughtLevel: "xhigh" }),
-    { model: "gpt-5.5/high", thoughtLevel: undefined, reasoningEncodedInModel: true },
+    resolveAcpxModelSelection({ agent: "codex", model: "gpt-5.6-sol/max", thoughtLevel: "xhigh" }),
+    { model: "gpt-5.6-sol", thoughtLevel: "max", reasoningEncodedInModel: true },
   );
 
   assert.deepEqual(
     resolveAcpxModelSelection({ agent: "codex", model: "gpt-5.5[xhigh]", thoughtLevel: "high" }),
-    { model: "gpt-5.5[xhigh]", thoughtLevel: undefined, reasoningEncodedInModel: true },
+    { model: "gpt-5.5", thoughtLevel: "xhigh", reasoningEncodedInModel: true },
   );
 });
 
@@ -181,7 +189,7 @@ test("resolveAcpxModelSelection keeps non-Codex and unknown Codex reasoning sepa
   );
 });
 
-test("buildSessionSetupCommands encodes Codex model reasoning for named sessions", () => {
+test("buildSessionSetupCommands configures Codex model and reasoning for named sessions", () => {
   const commands = buildSessionSetupCommands({
     agent: "codex",
     sessionName: "pull_request-38-fix-pr-default",
@@ -191,8 +199,9 @@ test("buildSessionSetupCommands encodes Codex model reasoning for named sessions
   });
 
   assert.deepEqual(commands.map((command) => command.args), [
-    ["codex", "set", "model", "gpt-5.4/xhigh", "-s", "pull_request-38-fix-pr-default"],
-    ["codex", "set-mode", "-s", "pull_request-38-fix-pr-default", "full-access"],
+    ["codex", "set", "model", "gpt-5.4", "-s", "pull_request-38-fix-pr-default"],
+    ["codex", "set", "-s", "pull_request-38-fix-pr-default", "reasoning_effort", "xhigh"],
+    ["codex", "set-mode", "-s", "pull_request-38-fix-pr-default", "agent-full-access"],
   ]);
 });
 
@@ -218,7 +227,7 @@ test("buildAcpxArgs keeps track-only synthesis in exec mode without a named sess
   assert.equal(args.includes("-s"), false);
 });
 
-test("runAcpx encodes GPT-5 Codex thought level into the exec model id", () => {
+test("runAcpx applies Codex model and reasoning to a one-shot exec", () => {
   const dir = mkdtempSync(join(tmpdir(), "acpx-track-only-test-"));
   const oldPath = process.env.PATH;
   const threadKey = "self-evolving/repo:pull_request:268:review:synthesize";
@@ -231,10 +240,10 @@ test("runAcpx encodes GPT-5 Codex thought level into the exec model id", () => {
       `#!/usr/bin/env node
 const fs = require("node:fs");
 const args = process.argv.slice(2);
-fs.appendFileSync(process.env.ACPX_TEST_CALLS, JSON.stringify({ args }) + "\\n");
+fs.appendFileSync(process.env.ACPX_TEST_CALLS, JSON.stringify({ args, codexConfig: process.env.CODEX_CONFIG }) + "\\n");
 if (args.includes("exec")) {
   process.stdout.write([
-    '{"jsonrpc":"2.0","id":1,"result":{"sessionId":"sess-track-only","models":{"currentModelId":"gpt-5.5/xhigh"}}}',
+    '{"jsonrpc":"2.0","id":1,"result":{"sessionId":"sess-track-only","models":{"currentModelId":"gpt-5.5[xhigh]"}}}',
     '{"jsonrpc":"2.0","method":"session/update","params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Done."}}}}',
     '{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}'
   ].join("\\n") + "\\n");
@@ -254,7 +263,7 @@ if (args.includes("exec")) {
       threadKey,
       permissionMode: "approve-all",
       thoughtLevel: "xhigh",
-      env: { ACPX_TEST_CALLS: callsPath },
+      env: { ACPX_TEST_CALLS: callsPath, CODEX_CONFIG: '{"web_search":true}' },
     });
 
     assert.equal(result.exitCode, 0);
@@ -265,7 +274,7 @@ if (args.includes("exec")) {
     const calls = readFileSync(callsPath, "utf8")
       .trim()
       .split("\n")
-      .map((line) => JSON.parse(line) as { args: string[] });
+      .map((line) => JSON.parse(line) as { args: string[]; codexConfig?: string });
 
     assert.deepEqual(calls.map((call) => call.args), [[
       "--approve-all",
@@ -274,11 +283,16 @@ if (args.includes("exec")) {
       "--json-strict",
       "--suppress-reads",
       "--model",
-      "gpt-5.5/xhigh",
+      "gpt-5.5",
       "codex",
       "exec",
       "synthesize current artifacts",
     ]]);
+    assert.deepEqual(JSON.parse(calls[0].codexConfig!), {
+      web_search: true,
+      model: "gpt-5.5",
+      model_reasoning_effort: "xhigh",
+    });
   } finally {
     if (oldPath === undefined) {
       delete process.env.PATH;
@@ -289,7 +303,7 @@ if (args.includes("exec")) {
   }
 });
 
-test("runAcpx applies Codex thought level for session_policy none exec runs", () => {
+test("runAcpx applies Codex reasoning effort for session_policy none exec runs", () => {
   const dir = mkdtempSync(join(tmpdir(), "acpx-exec-thought-test-"));
   const oldPath = process.env.PATH;
   const threadKey = "self-evolving/repo:pull_request:337:answer:default";
@@ -305,7 +319,7 @@ const args = process.argv.slice(2);
 fs.appendFileSync(process.env.ACPX_TEST_CALLS, JSON.stringify({ args }) + "\\n");
 if (args.includes("prompt")) {
   process.stdout.write([
-    '{"jsonrpc":"2.0","id":1,"result":{"sessionId":"sess-exec-thought","models":{"currentModelId":"gpt-5.4/xhigh"}}}',
+    '{"jsonrpc":"2.0","id":1,"result":{"sessionId":"sess-exec-thought","models":{"currentModelId":"gpt-5.4[xhigh]"}}}',
     '{"jsonrpc":"2.0","method":"session/update","params":{"update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Done."}}}}',
     '{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}'
   ].join("\\n") + "\\n");
@@ -340,8 +354,8 @@ if (args.includes("prompt")) {
 
     assert.deepEqual(calls.map((call) => call.args), [
       ["codex", "sessions", "new", "--name", sessionName],
-      ["codex", "set", "-s", sessionName, "thought_level", "xhigh"],
-      ["codex", "set-mode", "-s", sessionName, "full-access"],
+      ["codex", "set", "-s", sessionName, "reasoning_effort", "xhigh"],
+      ["codex", "set-mode", "-s", sessionName, "agent-full-access"],
       [
         "--approve-all",
         "--format",
@@ -482,7 +496,7 @@ test("selectPromptForSessionOutcome falls back to full prompt without continuati
   );
 });
 
-test("buildSessionSetupCommands configures thought level and full-access mode for persistent sessions", () => {
+test("buildSessionSetupCommands configures reasoning effort and agent-full-access mode", () => {
   const commands = buildSessionSetupCommands({
     agent: "codex",
     sessionName: "issue-24-implement-default",
@@ -492,17 +506,17 @@ test("buildSessionSetupCommands configures thought level and full-access mode fo
 
   assert.deepEqual(commands, [
     {
-      label: "set thought_level",
-      args: ["codex", "set", "-s", "issue-24-implement-default", "thought_level", "xhigh"],
+      label: "set reasoning_effort",
+      args: ["codex", "set", "-s", "issue-24-implement-default", "reasoning_effort", "xhigh"],
     },
     {
       label: "set-mode",
-      args: ["codex", "set-mode", "-s", "issue-24-implement-default", "full-access"],
+      args: ["codex", "set-mode", "-s", "issue-24-implement-default", "agent-full-access"],
     },
   ]);
 });
 
-test("buildSessionSetupCommands sets full-access mode for all persistent sessions", () => {
+test("buildSessionSetupCommands sets agent-full-access mode for persistent sessions", () => {
   const commands = buildSessionSetupCommands({
     agent: "codex",
     sessionName: "pull_request-38-review-default",
@@ -512,12 +526,12 @@ test("buildSessionSetupCommands sets full-access mode for all persistent session
 
   assert.deepEqual(commands, [
     {
-      label: "set thought_level",
-      args: ["codex", "set", "-s", "pull_request-38-review-default", "thought_level", "high"],
+      label: "set reasoning_effort",
+      args: ["codex", "set", "-s", "pull_request-38-review-default", "reasoning_effort", "high"],
     },
     {
       label: "set-mode",
-      args: ["codex", "set-mode", "-s", "pull_request-38-review-default", "full-access"],
+      args: ["codex", "set-mode", "-s", "pull_request-38-review-default", "agent-full-access"],
     },
   ]);
 });
@@ -543,7 +557,7 @@ test("buildSessionSetupCommands does nothing without a session and ignores blank
     [
       {
         label: "set-mode",
-        args: ["codex", "set-mode", "-s", "issue-24-answer-default", "full-access"],
+        args: ["codex", "set-mode", "-s", "issue-24-answer-default", "agent-full-access"],
       },
     ],
   );
@@ -745,6 +759,126 @@ test("runCommandWithFileCapture treats signal-terminated processes as failures",
   assert.equal(result.exitCode, 1);
 });
 
+test("runCommandWithFileCapture removes the ephemeral capture directory when progress stream is unset", () => {
+  const dir = mkdtempSync(join(tmpdir(), "acpx-capture-root-test-"));
+  const oldTmpdir = process.env.TMPDIR;
+  const oldProgressStreamFile = process.env.AGENT_PROGRESS_STREAM_FILE;
+  process.env.TMPDIR = dir;
+  delete process.env.AGENT_PROGRESS_STREAM_FILE;
+
+  try {
+    const result = runCommandWithFileCapture({
+      command: process.execPath,
+      args: ["-e", 'process.stdout.write("hello\\n")'],
+      cwd: process.cwd(),
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "hello\n");
+    assert.deepEqual(
+      readdirSync(dir).filter((entry) => entry.startsWith("acpx-capture-")),
+      [],
+    );
+  } finally {
+    if (oldTmpdir === undefined) {
+      delete process.env.TMPDIR;
+    } else {
+      process.env.TMPDIR = oldTmpdir;
+    }
+    if (oldProgressStreamFile === undefined) {
+      delete process.env.AGENT_PROGRESS_STREAM_FILE;
+    } else {
+      process.env.AGENT_PROGRESS_STREAM_FILE = oldProgressStreamFile;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCommandWithFileCapture persists stdout at AGENT_PROGRESS_STREAM_FILE", () => {
+  const dir = mkdtempSync(join(tmpdir(), "acpx-progress-stream-test-"));
+  try {
+    const streamPath = join(dir, "progress.ndjson");
+    const result = runCommandWithFileCapture({
+      command: process.execPath,
+      args: ["-e", 'process.stdout.write("one\\n"); process.stdout.write("two\\n");'],
+      cwd: process.cwd(),
+      env: { ...process.env, AGENT_PROGRESS_STREAM_FILE: streamPath },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "one\ntwo\n");
+    assert.equal(readFileSync(streamPath, "utf8"), "one\ntwo\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCommandWithFileCapture exposes progress stream growth during the run", () => {
+  const dir = mkdtempSync(join(tmpdir(), "acpx-progress-growth-test-"));
+  try {
+    const streamPath = join(dir, "progress.ndjson");
+    const observedPath = join(dir, "observed.txt");
+    const result = runCommandWithFileCapture({
+      command: process.execPath,
+      args: [
+        "-e",
+        `
+const fs = require("node:fs");
+process.stdout.write("first\\n", () => {
+  fs.writeFileSync(process.env.ACPX_TEST_OBSERVED_FILE, fs.readFileSync(process.env.AGENT_PROGRESS_STREAM_FILE, "utf8"));
+  setTimeout(() => {
+    process.stdout.write("second\\n", () => process.exit(0));
+  }, 25);
+});
+`,
+      ],
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        AGENT_PROGRESS_STREAM_FILE: streamPath,
+        ACPX_TEST_OBSERVED_FILE: observedPath,
+      },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(readFileSync(observedPath, "utf8"), "first\n");
+    assert.equal(readFileSync(streamPath, "utf8"), "first\nsecond\n");
+    assert.equal(result.stdout, "first\nsecond\n");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCommandWithFileCapture falls back when AGENT_PROGRESS_STREAM_FILE is unusable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "acpx-progress-fallback-test-"));
+  const warnings: string[] = [];
+  const oldWarn = console.warn;
+
+  try {
+    const invalidParent = join(dir, "not-a-directory");
+    const streamPath = join(invalidParent, "progress.ndjson");
+    writeFileSync(invalidParent, "file parent", "utf8");
+    console.warn = (message?: unknown, ...optionalParams: unknown[]) => {
+      warnings.push([message, ...optionalParams].map(String).join(" "));
+    };
+
+    const result = runCommandWithFileCapture({
+      command: process.execPath,
+      args: ["-e", 'process.stdout.write("fallback\\n")'],
+      cwd: process.cwd(),
+      env: { ...process.env, AGENT_PROGRESS_STREAM_FILE: streamPath },
+    });
+
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.stdout, "fallback\n");
+    assert.equal(existsSync(streamPath), false);
+    assert.match(warnings.join("\n"), /AGENT_PROGRESS_STREAM_FILE .*falling back to ephemeral acpx stdout capture/);
+  } finally {
+    console.warn = oldWarn;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("compactSessionLog merges tokens and keeps structured events", () => {
   const ndjson = [
     '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{}}',
@@ -831,6 +965,48 @@ test("readSessionIdentityResult streams large acpx metadata through file capture
       delete process.env.PATH;
     } else {
       process.env.PATH = oldPath;
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("readSessionIdentityResult does not overwrite the agent progress stream file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "acpx-identity-progress-test-"));
+  const oldPath = process.env.PATH;
+  const oldProgressStreamFile = process.env.AGENT_PROGRESS_STREAM_FILE;
+  try {
+    const acpxPath = join(dir, "acpx");
+    const streamPath = join(dir, "progress.ndjson");
+    writeFileSync(streamPath, "main agent stream\n", "utf8");
+    writeFileSync(
+      acpxPath,
+      `#!/usr/bin/env node\nprocess.stdout.write(JSON.stringify({ acpxRecordId: "record-123", acpSessionId: "session-456" }));\n`,
+      "utf8",
+    );
+    chmodSync(acpxPath, 0o755);
+    process.env.PATH = `${dir}${delimiter}${oldPath || ""}`;
+    process.env.AGENT_PROGRESS_STREAM_FILE = streamPath;
+
+    const result = readSessionIdentityResult("codex", "session-name", process.cwd());
+
+    assert.deepEqual(result, {
+      identity: {
+        acpxRecordId: "record-123",
+        acpxSessionId: "session-456",
+      },
+      error: "",
+    });
+    assert.equal(readFileSync(streamPath, "utf8"), "main agent stream\n");
+  } finally {
+    if (oldPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = oldPath;
+    }
+    if (oldProgressStreamFile === undefined) {
+      delete process.env.AGENT_PROGRESS_STREAM_FILE;
+    } else {
+      process.env.AGENT_PROGRESS_STREAM_FILE = oldProgressStreamFile;
     }
     rmSync(dir, { recursive: true, force: true });
   }
