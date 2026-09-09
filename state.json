@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "repo_slug": "ruochen-z/sepo-literature",
-  "last_sync_at": "2026-09-09T16:40:20Z",
+  "last_sync_at": "2026-09-09T20:55:50Z",
   "last_activity_at": "2026-09-03T02:28:55Z",
   "cursors": {
-    "issues": "2026-09-09T16:40:20Z",
-    "pulls": "2026-09-09T16:40:20Z",
-    "discussions": "2026-09-09T16:40:20Z",
-    "commits": "2026-09-09T16:40:20Z"
+    "issues": "2026-09-09T20:55:50Z",
+    "pulls": "2026-09-09T20:55:50Z",
+    "discussions": "2026-09-09T20:55:50Z",
+    "commits": "2026-09-09T20:55:50Z"
   },
-  "last_run_url": "https://github.com/ruochen-z/sepo-literature/actions/runs/34377882942",
+  "last_run_url": "https://github.com/ruochen-z/sepo-literature/actions/runs/34403922467",
   "created_at": "2026-06-26T04:39:47.942Z",
-  "updated_at": "2026-09-09T16:40:23.232Z"
+  "updated_at": "2026-09-09T20:55:52.802Z"
 }
